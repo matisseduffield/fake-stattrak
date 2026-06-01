@@ -67,7 +67,7 @@ module.exports = class CSGOServer extends ServerShared {
 		});
 	}
 
-	async incrementKillCountAttribute(killerID, victimID, itemID, eventType, amount) {
+	async incrementKillCountAttribute(killerID, victimID, itemID, eventType, amount, onProgress = ServerShared.defaultProgress) {
 		let eventTypeInfo = EventTypes[730]?.[eventType];
 		let maximumMultiSendAtOnce = 100; // CS2 doesn't support multi-messages but we can send multiple GC messages at once
 		let increment = eventTypeInfo?.allowIncrement ? 1_000 : 1;
@@ -76,7 +76,7 @@ module.exports = class CSGOServer extends ServerShared {
 
 		// We send 10K at once
 		for (let i = 0; i < chunksNeeded; i ++) {
-			console.log(`Progress: ${i * increment * maximumMultiSendAtOnce} / ${amount}`);
+			onProgress(Math.min(i * increment * maximumMultiSendAtOnce, amount), amount);
 			await new Promise(p => setTimeout(p, 50));
 
 			let sendAtOnce = Math.min(maximumMultiSendAtOnce, multiSendsNeeded - (i * maximumMultiSendAtOnce));
@@ -100,6 +100,6 @@ module.exports = class CSGOServer extends ServerShared {
 		}
 
 		// We are done! Final progress log (Its not truly calculated so if the above math is wrong this will be wrong too, lets hope I am smart)
-		console.log(`Progress: ${amount} / ${amount}`);
+		onProgress(amount, amount);
 	}
 }

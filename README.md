@@ -23,20 +23,40 @@ These StatTrak increments basically just tell Valve to update the item and chang
 ## Requirements
 
 - [NodeJS](https://nodejs.org/en/) - `v18.10.0` or later
-- [A bit of JSON knowledge](https://www.json.org/)
 - A bot account
 
 ## Usage
 
 1. Download this repository
-2. Rename `config.json.example` to `config.json`
-3. Adjust your config - [More Info](#config)
-4. Open a command prompt inside the folder
-5. Run `npm install` to install all dependencies
-6. Exit out of Steam - [Read Why](#valve-anti-cheat)
-7. Run `node index.js`
+2. Open a command prompt inside the folder
+3. Run `npm install` to install all dependencies
+4. Exit out of Steam - [Read Why](#valve-anti-cheat)
+5. Run `node index.js` and follow the prompts
+
+The interactive setup walks you through everything - picking the game, logging
+in (including Steam Guard codes), choosing the item and the stat to change, and
+how much to add. No need to edit any files by hand.
+
+### Quality of life features
+
+- **Interactive prompts** - pick the game, stat and amount from menus instead of editing JSON.
+- **Inventory item picker** - if your inventory is public it lists your StatTrak/Strange items so you can pick one instead of looking up the item ID.
+- **Steam Guard / 2FA support** - you'll be asked for your mobile or email code at login when needed.
+- **Live progress bar** - see exactly how far along the increments are.
+- **Fast startup** - only the required protobufs are loaded, so connecting takes a moment instead of a minute.
+- **Saved config** - optionally save your answers to `config.json` and re-run non-interactively with `node index.js --config`.
+
+### Running non-interactively
+
+If you prefer the old behaviour, create a `config.json` (see `config.json.example`) and run:
+
+```
+node index.js --config
+```
 
 ## Config
+
+Used by `node index.js --config`. The interactive mode can create this file for you.
 
 - `boostingAccount`: Object - Account details of the account with the item you want to boost
   - `username`: String - Login username
