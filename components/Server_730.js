@@ -69,7 +69,7 @@ module.exports = class CSGOServer extends ServerShared {
 
 	async incrementKillCountAttribute(killerID, victimID, itemID, eventType, amount) {
 		let eventTypeInfo = EventTypes[730]?.[eventType];
-		let maximumMultiSendAtOnce = 100; // CSGO doesn't support multi-messages but we can send multiple GC messages at once
+		let maximumMultiSendAtOnce = 100; // CS2 doesn't support multi-messages but we can send multiple GC messages at once
 		let increment = eventTypeInfo?.allowIncrement ? 1_000 : 1;
 		let multiSendsNeeded = Math.ceil(amount / increment);
 		let chunksNeeded = Math.ceil(multiSendsNeeded / maximumMultiSendAtOnce);
@@ -81,12 +81,14 @@ module.exports = class CSGOServer extends ServerShared {
 
 			let sendAtOnce = Math.min(maximumMultiSendAtOnce, multiSendsNeeded - (i * maximumMultiSendAtOnce));
 			for (let j = 0; j < sendAtOnce; j++) {
+				// Global message index so the final (partial) increment stays correct even when it spans a chunk boundary
+				let sent = (i * maximumMultiSendAtOnce + j) * increment;
 				let data = {
 					killer_account_id: killerID.accountid,
 					victim_account_id: victimID.accountid,
 					item_id: itemID,
 					event_type: eventType,
-					amount: Math.min(increment, amount - (j * increment))
+					amount: Math.min(increment, amount - sent)
 				};
 				this.coordinator.sendMessage(
 					this.appID,

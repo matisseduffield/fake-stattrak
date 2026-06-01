@@ -1,6 +1,6 @@
 module.exports = {
 	730: {
-		// CSGO does not support "allowIncrement" at all
+		// Counter-Strike 2 (App ID 730, formerly CS:GO) does not support "allowIncrement" at all
 		0: {
 			name: "StatTrak™ Confirmed Kills",
 			internal: "Kills",

@@ -108,7 +108,9 @@ module.exports = class TF2Server extends ServerShared {
 							event_type: eventType
 						};
 						if (eventTypeInfo?.allowIncrement) {
-							data.increment_value = Math.min(increment, amount - (j * increment));
+							// Global message index so the final (partial) increment stays correct even when it spans a chunk boundary
+							let sent = (i * maximumMultipleChildren + j) * increment;
+							data.increment_value = Math.min(increment, amount - sent);
 						}
 						return data;
 					})
