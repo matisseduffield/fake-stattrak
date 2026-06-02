@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Fake StatTrak</title>
+	<link rel="stylesheet" href="style.css">
+</head>
+<body>
+	<header>
+		<div class="brand">
+			<span class="logo">ST</span>
+			<div>
+				<h1>Fake StatTrak</h1>
+				<div class="subtitle">Boost StatTrak / Strange counters in CS2 &amp; TF2</div>
+			</div>
+		</div>
+		<div class="status" id="statusPill">
+			<span class="dot" id="statusDot"></span>
+			<span id="statusText">Disconnected</span>
+		</div>
+	</header>
+
+	<div id="errorBanner" class="banner hidden"></div>
+
+	<main>
+		<!-- Connect panel -->
+		<section class="card" id="connectCard">
+			<h2>Connect</h2>
+			<p class="hint">Log out of the Steam client first to avoid VAC session warnings.</p>
+
+			<label>Game
+				<select id="gameSelect"></select>
+			</label>
+
+			<fieldset>
+				<legend>Boosting account <span class="muted">(owns the item)</span></legend>
+				<div class="account-fields" data-role="boosting"></div>
+			</fieldset>
+
+			<fieldset>
+				<legend>Bot account <span class="muted">(fills the server)</span></legend>
+				<div class="account-fields" data-role="bot"></div>
+			</fieldset>
+
+			<label class="checkbox">
+				<input type="checkbox" id="forceConnect">
+				Force (skip the post-throttle cooldown)
+			</label>
+
+			<button class="primary" id="connectBtn">Connect</button>
+		</section>
+
+		<!-- Connected view -->
+		<section class="card hidden" id="connectedCard">
+			<div class="connected-head">
+				<div>
+					<h2 id="connectedGame">Connected</h2>
+					<div class="muted" id="connectedAccounts"></div>
+				</div>
+				<button class="ghost" id="disconnectBtn">Disconnect</button>
+			</div>
+
+			<div class="inventory-head">
+				<h3>Inventory</h3>
+				<div class="inv-controls">
+					<input type="search" id="invSearch" placeholder="Filter items...">
+					<button class="ghost small" id="refreshInvBtn">Refresh</button>
+				</div>
+			</div>
+			<div class="muted" id="invMessage"></div>
+			<div class="grid" id="inventoryGrid"></div>
+
+			<details class="manual">
+				<summary>Add an item by ID instead</summary>
+				<div class="manual-row">
+					<input type="text" id="manualItemId" placeholder="Item ID (numbers only)">
+					<button class="ghost small" id="manualSelectBtn">Use this ID</button>
+				</div>
+			</details>
+		</section>
+	</main>
+
+	<!-- Queue + log sidebar -->
+	<aside class="card hidden" id="queueCard">
+		<div class="queue-head">
+			<h3>Job queue</h3>
+			<div class="queue-actions">
+				<button class="ghost small" id="clearFinishedBtn">Clear done</button>
+				<button class="primary small" id="runBtn">Start</button>
+				<button class="danger small hidden" id="stopBtn">Stop</button>
+			</div>
+		</div>
+		<div id="queueList" class="queue-list"></div>
+
+		<h3 class="log-title">Activity</h3>
+		<div id="log" class="log"></div>
+	</aside>
+
+	<!-- Add-to-queue dialog -->
+	<div class="overlay hidden" id="jobDialog">
+		<div class="dialog">
+			<h3 id="jobDialogTitle">Add to queue</h3>
+			<img id="jobDialogImg" class="job-dialog-img hidden" alt="">
+			<label>Stat
+				<select id="jobStat"></select>
+			</label>
+			<label>Amount to add
+				<input type="text" id="jobAmount" placeholder="e.g. 1000 or 1,000,000" value="1000">
+			</label>
+			<div class="dialog-actions">
+				<button class="ghost" id="jobCancel">Cancel</button>
+				<button class="primary" id="jobAdd">Add to queue</button>
+			</div>
+		</div>
+	</div>
+
+	<!-- Steam Guard dialog -->
+	<div class="overlay hidden" id="guardDialog">
+		<div class="dialog">
+			<h3>Steam Guard</h3>
+			<p id="guardText"></p>
+			<input type="text" id="guardCode" placeholder="Code" autocomplete="one-time-code">
+			<div class="dialog-actions">
+				<button class="primary" id="guardSubmit">Submit</button>
+			</div>
+		</div>
+	</div>
+
+	<script src="app.js"></script>
+</body>
+</html>

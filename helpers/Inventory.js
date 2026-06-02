@@ -10,7 +10,7 @@ module.exports = class Inventory {
 	 *
 	 * @param {String} steamID64 The owner's 64-bit Steam ID
 	 * @param {Number} appID 730 (CS2) or 440 (TF2)
-	 * @returns {Promise<Array<{ itemID: string, name: string }>>}
+	 * @returns {Promise<Array<{ itemID: string, name: string, iconUrl: string|null, count: number|null, color: string|null }>>}
 	 */
 	static async getBoostableItems(steamID64, appID) {
 		// Context 2 is the standard "Backpack" context for both CS2 and TF2
@@ -53,11 +53,54 @@ module.exports = class Inventory {
 
 			items.push({
 				itemID: String(asset.assetid),
-				name: desc.market_hash_name || desc.market_name || desc.name || `Item ${asset.assetid}`
+				name: desc.market_hash_name || desc.market_name || desc.name || `Item ${asset.assetid}`,
+				iconUrl: this.iconUrl(desc),
+				count: this.currentCount(desc),
+				color: desc.name_color ? `#${desc.name_color}` : null
 			});
 		}
 
+		// Show StatTrak/Strange items first, then alphabetical
+		items.sort((a, b) => a.name.localeCompare(b.name));
 		return items;
+	}
+
+	/**
+	 * Build a usable image URL from a Steam inventory description's icon token.
+	 * @param {Object} desc Steam inventory description object
+	 * @returns {String|null}
+	 */
+	static iconUrl(desc) {
+		let token = desc.icon_url_large || desc.icon_url;
+		if (!token) {
+			return null;
+		}
+		return `https://community.fastly.steamstatic.com/economy/image/${token}/256fx256f`;
+	}
+
+	/**
+	 * Best-effort current counter value, parsed from the item's description text
+	 * (e.g. "StatTrak™ Kills: 1337"). Not always present in public inventory
+	 * data, in which case this returns null.
+	 * @param {Object} desc Steam inventory description object
+	 * @returns {Number|null}
+	 */
+	static currentCount(desc) {
+		let lines = []
+			.concat(Array.isArray(desc.descriptions) ? desc.descriptions : [])
+			.concat(Array.isArray(desc.owner_descriptions) ? desc.owner_descriptions : []);
+
+		for (let line of lines) {
+			let text = (line && line.value) || "";
+			let match = text.match(/(?:StatTrak|Strange|Kills?)[^\d]*([\d,]+)/i);
+			if (match) {
+				let n = Number(match[1].replace(/,/g, ""));
+				if (Number.isFinite(n)) {
+					return n;
+				}
+			}
+		}
+		return null;
 	}
 
 	/**

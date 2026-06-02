@@ -79,7 +79,7 @@ module.exports = class TF2Server extends ServerShared {
 		});
 	}
 
-	async incrementKillCountAttribute(killerID, victimID, itemID, eventType, amount, onProgress = ServerShared.defaultProgress) {
+	async incrementKillCountAttribute(killerID, victimID, itemID, eventType, amount, onProgress = ServerShared.defaultProgress, shouldStop = () => false) {
 		let eventTypeInfo = EventTypes[440]?.[eventType];
 		let killerID64 = killerID.getSteamID64();
 		let victimID64 = victimID.getSteamID64();
@@ -92,6 +92,9 @@ module.exports = class TF2Server extends ServerShared {
 		let chunksNeeded = Math.ceil(multiMessagesNeeded / maximumMultipleChildren);
 
 		for (let i = 0; i < chunksNeeded; i++) {
+			if (shouldStop()) {
+				return; // Caller asked us to stop (e.g. GUI stop button)
+			}
 			onProgress(Math.min(i * increment * maximumMultipleChildren, amount), amount);
 			await new Promise(p => setTimeout(p, 50));
 

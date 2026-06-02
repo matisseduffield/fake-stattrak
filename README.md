@@ -33,14 +33,33 @@ These StatTrak increments basically just tell Valve to update the item and chang
 git clone https://github.com/matisseduffield/fake-stattrak.git
 cd fake-stattrak
 npm install
-npm start
+npm run gui
 ```
 
-`npm start` is the same as `node index.js`. **Log out of / exit Steam before running** - see [Valve Anti-Cheat](#valve-anti-cheat).
+Then open **http://localhost:3000** in your browser. **Log out of / exit Steam before running** - see [Valve Anti-Cheat](#valve-anti-cheat).
 
-That's it - the interactive setup asks you everything. Run `node index.js --help` for the available options.
+There are two ways to use the tool - pick whichever you prefer:
 
-## Walkthrough
+- **Web GUI** (`npm run gui`) - a local browser app with a visual inventory grid, saved accounts, a job queue and a live log. Recommended.
+- **Command line** (`npm start`) - an interactive terminal wizard. Run `node index.js --help` for options.
+
+## Web GUI
+
+Run `npm run gui` and open the printed URL (default http://localhost:3000). Everything runs locally on your machine - nothing is sent anywhere except to Steam, exactly like the CLI.
+
+Features:
+
+- **Visual inventory grid** - your StatTrak/Strange items shown with their images (and current count where Steam exposes it); click one to queue it.
+- **Account manager** - the accounts you use are remembered in a dropdown (optionally with the password); a saved login session means you usually won't need to re-enter Steam Guard.
+- **Job queue + live log** - line up several items/amounts and run them one after another, with a per-job progress bar, a **Stop** button, and a live activity log.
+- **Status & cooldown** - a connection indicator, clear error banners, and the post-throttle cooldown is shown so you know when you can retry.
+- **Steam Guard in the browser** - if an account needs a 2FA code you'll be prompted for it in a dialog.
+
+Set a different port with `PORT=8080 npm run gui`.
+
+> The GUI binds to `localhost` only. Don't expose it to the internet - it can log into your Steam accounts.
+
+## CLI walkthrough
 
 When you run `node index.js` it walks you through each step:
 
