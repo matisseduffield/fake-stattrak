@@ -32,7 +32,10 @@ module.exports = class ClientShared extends Events {
 			ProtobufFiles.app[this.appID]
 		]);
 
-		this.client = new SteamUser();
+		// autoRelogin would silently reconnect and re-attempt the login on transient
+		// errors, which can quietly spam Steam and trigger login throttling. This is a
+		// one-shot tool, so we manage logins ourselves and keep retries off.
+		this.client = new SteamUser({ autoRelogin: false });
 		this.coordinator = new Coordinator(this.client, this.appID);
 
 		this.coordinator.on("receivedFromSteam", this._receivedFromSteam.bind(this));

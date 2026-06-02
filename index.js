@@ -24,6 +24,7 @@ const HELP_TEXT = `Fake StatTrak - apply fake kills to StatTrak / Strange weapon
 Usage:
   node index.js            Interactive setup (recommended) - asks you everything
   node index.js --config   Run non-interactively using config.json
+  node index.js --force     Skip the post-throttle cooldown and try logging in now
   node index.js --help      Show this help
 
 Interactive mode walks you through the game, accounts (including Steam Guard
@@ -78,13 +79,29 @@ const onCancel = () => {
 function handleFatalError(err) {
 	process.exitCode = 1;
 
+	// Errors we raised on purpose (e.g. the throttle cooldown) already carry a
+	// user-friendly message, so just print it and stop.
+	if (err && err.handled) {
+		console.error("\n" + err.message);
+		setTimeout(() => process.exit(1), 250);
+		return;
+	}
+
 	let eresultName = err && typeof err.eresult === "number" ? SteamUser.EResult[err.eresult] : null;
 	console.error("\nSomething went wrong: " + (err && err.message ? err.message : err));
 
+	let throttleHint = [
+		"Steam is temporarily blocking logins for this account/IP after too many attempts.",
+		"This is a Steam limit, not a problem with this tool.",
+		"- Stop running it for a while - each new attempt can RESET the wait (often 30+ minutes, sometimes hours).",
+		"- Logging in from a different network (e.g. a phone hotspot) avoids the block, and the saved session means you only log in once.",
+		"- If you've been using your email as the username, try your Steam account name instead."
+	].join("\n");
+
 	let hint = {
-		InvalidPassword: "Steam rejected the login - double-check the username and password (and that the account isn't using a login QR/token only).",
-		RateLimitExceeded: "Steam is rate limiting logins from your IP. Wait a while (often 30+ minutes) before trying again.",
-		AccountLoginDeniedThrottle: "Too many login attempts. Wait a while before trying again.",
+		InvalidPassword: "Steam rejected the login. Double-check the password, and if you're using your email as the username try your Steam account name instead.",
+		RateLimitExceeded: throttleHint,
+		AccountLoginDeniedThrottle: throttleHint,
 		TwoFactorCodeMismatch: "The Steam Guard code didn't match. Make sure your phone's clock is correct and try again.",
 		AccountDisabled: "This Steam account is disabled and can't be used."
 	}[eresultName];
@@ -163,10 +180,16 @@ async function promptAccount(label, previous) {
 	let { username } = await prompts({
 		type: "text",
 		name: "username",
-		message: `Login username for ${label}:`,
+		message: `Login username for ${label} (the name you log into Steam with):`,
 		initial: previous?.username || "",
 		validate: (v) => v && v.trim().length ? true : "Username is required"
 	}, { onCancel });
+
+	if (username.includes("@")) {
+		// Steam normally signs in with the account name rather than the email, but
+		// don't block it - just flag it in case a failed login is down to this.
+		console.log("Note: Steam usually signs in with your account name, not your email. If this login fails, try your Steam account name instead.");
+	}
 
 	let { password } = await prompts({
 		type: "password",
@@ -242,6 +265,21 @@ async function resolveItemID(steamID64, appID) {
 // ---------------------------------------------------------------------------
 // Validation
 // ---------------------------------------------------------------------------
+
+// Human-friendly duration like "12 minutes" / "1 minute 30 seconds"
+function formatDuration(ms) {
+	let totalSeconds = Math.ceil(ms / 1000);
+	let minutes = Math.floor(totalSeconds / 60);
+	let seconds = totalSeconds % 60;
+	let parts = [];
+	if (minutes > 0) {
+		parts.push(`${minutes} minute${minutes === 1 ? "" : "s"}`);
+	}
+	if (seconds > 0 && minutes < 5) {
+		parts.push(`${seconds} second${seconds === 1 ? "" : "s"}`);
+	}
+	return parts.join(" ") || "a moment";
+}
 
 // Parse a user-entered amount, allowing thousands separators ("1,000,000").
 // Returns a positive safe integer, or null if it isn't a valid amount.
@@ -370,27 +408,51 @@ async function steamGuardPrompt(domain, lastCodeWrong, username) {
 // to re-enter the password / Steam Guard code (and don't trip Steam's throttling)
 // on every run. Falls back to a normal credential login if there's no usable token.
 async function loginWithSession(client, account) {
+	// If Steam recently throttled this account, don't immediately try again -
+	// re-attempting too soon can extend the throttle. (Override with --force.)
+	let remaining = Sessions.throttleRemainingMs(account.username);
+	if (remaining > 0 && !process.argv.includes("--force")) {
+		let err = new Error(
+			`${account.username} was throttled by Steam recently. Waiting protects you from a longer block.\n` +
+			`Try again in about ${formatDuration(remaining)} (or pass --force to attempt anyway).`
+		);
+		err.handled = true;
+		throw err;
+	}
+
 	let options = {
 		onSteamGuard: steamGuardPrompt,
-		onRefreshToken: (token) => Sessions.set(account.username, token)
+		onRefreshToken: (token) => Sessions.setToken(account.username, token)
 	};
 
-	let saved = Sessions.get(account.username);
+	let attempt = async (extra) => {
+		try {
+			await client.login(account.username, account.password, { ...options, ...extra });
+			Sessions.clearThrottle(account.username); // success - clear any throttle marker
+		} catch (err) {
+			if (NO_RETRY_ERESULTS.has(err && err.eresult)) {
+				Sessions.markThrottled(account.username); // back off on the next run
+			}
+			throw err;
+		}
+	};
+
+	let saved = Sessions.getToken(account.username);
 	if (saved) {
 		try {
 			console.log(`Using saved session for ${account.username} (no password/Steam Guard needed)...`);
-			await client.login(account.username, account.password, { ...options, refreshToken: saved });
+			await attempt({ refreshToken: saved });
 			return;
 		} catch (err) {
 			if (NO_RETRY_ERESULTS.has(err && err.eresult)) {
 				throw err; // Throttled/rate-limited - keep the token, retrying won't help right now
 			}
-			Sessions.remove(account.username);
+			Sessions.removeToken(account.username);
 			console.log(`Saved session for ${account.username} no longer works - logging in with the password instead.`);
 		}
 	}
 
-	await client.login(account.username, account.password, options);
+	await attempt({});
 }
 
 // ---------------------------------------------------------------------------

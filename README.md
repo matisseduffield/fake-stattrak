@@ -61,6 +61,7 @@ Sending [##############################] 100.0%  1,337 / 1,337
 
 A few notes:
 
+- The **login username is the name you sign into Steam with** - usually your Steam account name rather than your email. If a login fails, double-check this.
 - You'll only be asked for a **Steam Guard code** if the account has 2FA enabled (mobile or email). The prompt tells you where to get the code.
 - The **item picker** only appears if your inventory is set to **public**. If it's private or empty you'll be asked to type the item ID instead - see [Find Item ID](#find-item-id).
 - Stats that only count on official Valve servers (such as Competitive MVPs) are hidden, because they can't be boosted this way.
@@ -72,6 +73,7 @@ A few notes:
 - **Inventory item picker** - if your inventory is public it lists your StatTrak/Strange items so you can pick one instead of looking up the item ID.
 - **Steam Guard / 2FA support** - you'll be asked for your mobile or email code at login when needed.
 - **Remembered logins** - after a successful login the session is saved to `sessions.json`, so the next run skips the password and Steam Guard prompts (and is far less likely to hit Steam's login throttling). Delete `sessions.json` to forget the saved logins.
+- **Throttle-safe logins** - automatic re-login retries are disabled and, if Steam ever throttles a login, the tool waits 30 minutes before trying that account again (override with `--force`) so it can't keep hammering Steam.
 - **Live progress bar** - see exactly how far along the increments are.
 - **Fast startup** - only the required protobufs are loaded, so connecting takes about a second instead of a minute.
 - **Saved config** - optionally save your answers to `config.json` and re-run non-interactively with `node index.js --config`.
@@ -107,7 +109,7 @@ Used by `node index.js --config`. The interactive mode can create this file for 
 
 - **`Failed to connect to Steam`** - the Game Coordinator didn't answer. Make sure you're fully logged out of the Steam client, wait a moment and try again; Steam occasionally needs a couple of attempts.
 - **`InvalidPassword`** - the username or password was wrong. Some accounts can no longer log in with a password alone - make sure the account has a normal password set.
-- **`RateLimitExceeded` / `AccountLoginDeniedThrottle`** - too many login attempts from your IP. Wait a while (often 30+ minutes) before trying again. Once you've logged in successfully once, the saved session in `sessions.json` lets later runs skip logging in, which avoids most throttling.
+- **`RateLimitExceeded` / `AccountLoginDeniedThrottle`** - Steam is throttling logins for this account after too many attempts (this is account-based, so changing your IP doesn't reset it). The tool now backs off automatically: after a throttle it won't re-attempt that account for 30 minutes, so re-running won't make it worse - just wait it out (the real Steam block can be longer). You can override the cooldown with `node index.js --force`, and logging in from a different network or via the saved session avoids the block entirely. If logins keep failing (not throttling), make sure the username is the name you sign into Steam with (usually the account name, not the email).
 - **Wrong Steam Guard code** - check that your phone's clock is accurate, then re-run and enter a fresh code.
 - **No items in the picker** - your inventory is probably private. Set it to public ([privacy settings](https://steamcommunity.com/my/edit/settings)) or enter the item ID manually.
 - **The new count doesn't show up** - it can take a few minutes for Valve to process, and your inventory may be briefly inaccessible. Double-check you used the correct item ID if it never appears.

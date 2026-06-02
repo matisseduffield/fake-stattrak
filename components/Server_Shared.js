@@ -68,7 +68,9 @@ module.exports = class ServerShared extends Events {
 			ProtobufFiles.app[this.appID]
 		]);
 
-		this.client = new SteamUser();
+		// See Client_Shared: keep auto-relogin off so we never silently re-attempt
+		// logins (which can trip Steam's login throttling).
+		this.client = new SteamUser({ autoRelogin: false });
 		this.coordinator = new Coordinator(this.client, this.appID);
 
 		this.coordinator.on("receivedFromSteam", this._receivedFromSteam.bind(this));
