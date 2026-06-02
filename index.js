@@ -5,6 +5,13 @@ const SteamUser = require("steam-user");
 const Helper = require("./helpers/Helper.js");
 const EventTypes = require("./helpers/EventTypes.js");
 const Inventory = require("./helpers/Inventory.js");
+const Sessions = require("./helpers/Sessions.js");
+
+// Login errors where retrying immediately won't help - don't burn another attempt
+const NO_RETRY_ERESULTS = new Set([
+	SteamUser.EResult.RateLimitExceeded,
+	SteamUser.EResult.AccountLoginDeniedThrottle
+]);
 
 const CONFIG_PATH = path.join(__dirname, "config.json");
 const GAMES = {
@@ -128,14 +135,16 @@ async function gatherConfig() {
 
 	let eventType = await promptEventType(appID);
 
-	let { incrementValue } = await prompts({
-		type: "number",
-		name: "incrementValue",
+	// A plain text field is much smoother to type into than the number prompt, and
+	// it lets people paste values like "1,000,000".
+	let { incrementRaw } = await prompts({
+		type: "text",
+		name: "incrementRaw",
 		message: "How much do you want to add to the counter?",
-		initial: 1,
-		min: 1,
-		validate: (v) => (Number.isInteger(v) && v > 0) ? true : "Enter a whole number greater than 0"
+		initial: "1",
+		validate: (v) => parseAmount(v) ? true : "Enter a whole number greater than 0 (e.g. 1000 or 1,000,000)"
 	}, { onCancel });
+	let incrementValue = parseAmount(incrementRaw);
 
 	let config = {
 		boostingAccount,
@@ -233,6 +242,17 @@ async function resolveItemID(steamID64, appID) {
 // ---------------------------------------------------------------------------
 // Validation
 // ---------------------------------------------------------------------------
+
+// Parse a user-entered amount, allowing thousands separators ("1,000,000").
+// Returns a positive safe integer, or null if it isn't a valid amount.
+function parseAmount(value) {
+	let cleaned = String(value == null ? "" : value).replace(/[,_\s]/g, "");
+	if (!/^\d+$/.test(cleaned)) {
+		return null;
+	}
+	let number = Number(cleaned);
+	return Number.isSafeInteger(number) && number > 0 ? number : null;
+}
 
 function validateConfig(config) {
 	let errors = [];
@@ -346,6 +366,33 @@ async function steamGuardPrompt(domain, lastCodeWrong, username) {
 	return code;
 }
 
+// Log a client in, reusing a saved refresh token when possible so we don't have
+// to re-enter the password / Steam Guard code (and don't trip Steam's throttling)
+// on every run. Falls back to a normal credential login if there's no usable token.
+async function loginWithSession(client, account) {
+	let options = {
+		onSteamGuard: steamGuardPrompt,
+		onRefreshToken: (token) => Sessions.set(account.username, token)
+	};
+
+	let saved = Sessions.get(account.username);
+	if (saved) {
+		try {
+			console.log(`Using saved session for ${account.username} (no password/Steam Guard needed)...`);
+			await client.login(account.username, account.password, { ...options, refreshToken: saved });
+			return;
+		} catch (err) {
+			if (NO_RETRY_ERESULTS.has(err && err.eresult)) {
+				throw err; // Throttled/rate-limited - keep the token, retrying won't help right now
+			}
+			Sessions.remove(account.username);
+			console.log(`Saved session for ${account.username} no longer works - logging in with the password instead.`);
+		}
+	}
+
+	await client.login(account.username, account.password, options);
+}
+
 // ---------------------------------------------------------------------------
 // Main run
 // ---------------------------------------------------------------------------
@@ -361,10 +408,8 @@ async function run(config, headless) {
 		new Client()  // boosting (owns the item)
 	];
 
-	let guardOptions = { onSteamGuard: steamGuardPrompt };
-
 	console.log("Logging into the boosting account...");
-	await clients[1].login(config.boostingAccount.username, config.boostingAccount.password, guardOptions);
+	await loginWithSession(clients[1], config.boostingAccount);
 	console.log("Logged in as " + clients[1].steamID.getSteamID64());
 
 	// Resolve the item to boost now that the owning account is logged in
@@ -373,7 +418,7 @@ async function run(config, headless) {
 	}
 
 	console.log("Logging into the bot account and the fake server...");
-	await clients[0].login(config.botAccount.username, config.botAccount.password, guardOptions);
+	await loginWithSession(clients[0], config.botAccount);
 	let serverID = await server.login();
 	console.log("Bot logged in as " + clients[0].steamID.getSteamID64());
 	console.log("Fake server logged in as " + server.steamID.getSteamID64());
