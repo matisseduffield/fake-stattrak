@@ -32,10 +32,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/BeepIsla/fake-stattrak.git"
+    "url": "git+https://github.com/matisseduffield/fake-stattrak.git"
   },
   "bugs": {
-    "url": "https://github.com/BeepIsla/fake-stattrak/issues"
+    "url": "https://github.com/matisseduffield/fake-stattrak/issues"
   },
-  "homepage": "https://github.com/BeepIsla/fake-stattrak#readme"
+  "homepage": "https://github.com/matisseduffield/fake-stattrak#readme"
 }
