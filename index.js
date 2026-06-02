@@ -81,10 +81,18 @@ function handleFatalError(err) {
 	let eresultName = err && typeof err.eresult === "number" ? SteamUser.EResult[err.eresult] : null;
 	console.error("\nSomething went wrong: " + (err && err.message ? err.message : err));
 
+	let throttleHint = [
+		"Steam is temporarily blocking logins for this account/IP after too many attempts.",
+		"This is a Steam limit, not a problem with this tool.",
+		"- Stop running it for a while - each new attempt can RESET the wait (often 30+ minutes, sometimes hours).",
+		"- Make sure the username is your Steam ACCOUNT NAME, not your email - a wrong name fails every time and feeds the throttle.",
+		"- Logging in from a different network (e.g. a phone hotspot) avoids the block, and the saved session means you only log in once."
+	].join("\n");
+
 	let hint = {
-		InvalidPassword: "Steam rejected the login - double-check the username and password (and that the account isn't using a login QR/token only).",
-		RateLimitExceeded: "Steam is rate limiting logins from your IP. Wait a while (often 30+ minutes) before trying again.",
-		AccountLoginDeniedThrottle: "Too many login attempts. Wait a while before trying again.",
+		InvalidPassword: "Steam rejected the login. Check that the username is your Steam ACCOUNT NAME (not your email) and that the password is correct.",
+		RateLimitExceeded: throttleHint,
+		AccountLoginDeniedThrottle: throttleHint,
 		TwoFactorCodeMismatch: "The Steam Guard code didn't match. Make sure your phone's clock is correct and try again.",
 		AccountDisabled: "This Steam account is disabled and can't be used."
 	}[eresultName];
@@ -163,9 +171,17 @@ async function promptAccount(label, previous) {
 	let { username } = await prompts({
 		type: "text",
 		name: "username",
-		message: `Login username for ${label}:`,
+		message: `Steam account name for ${label} (the name you log into Steam with, NOT your email):`,
 		initial: previous?.username || "",
-		validate: (v) => v && v.trim().length ? true : "Username is required"
+		validate: (v) => {
+			if (!v || !v.trim().length) {
+				return "Username is required";
+			}
+			if (v.includes("@")) {
+				return "Use your Steam account name, not your email address";
+			}
+			return true;
+		}
 	}, { onCancel });
 
 	let { password } = await prompts({
@@ -269,6 +285,8 @@ function validateConfig(config) {
 		let acc = config[key];
 		if (!acc || !acc.username || !acc.password) {
 			errors.push(`${key} is missing a username and/or password`);
+		} else if (String(acc.username).includes("@")) {
+			errors.push(`${key}.username looks like an email - use the Steam account name you log in with instead`);
 		}
 	}
 
