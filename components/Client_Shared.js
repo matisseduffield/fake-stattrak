@@ -64,11 +64,26 @@ module.exports = class ClientShared extends Events {
 				this.clientVersionNice = versionNiceAppIdParser[this.appID](this.clientVersion);
 				this.clientVersion = Number(this.clientVersion);
 
-				// Login
-				this.client.logOn({
-					accountName: username,
-					password: password
-				});
+				// Login - reuse a saved refresh token if one was provided (skips the
+				// password + Steam Guard prompts), otherwise use the credentials.
+				if (options.refreshToken) {
+					this.client.logOn({
+						refreshToken: options.refreshToken
+					});
+				} else {
+					this.client.logOn({
+						accountName: username,
+						password: password
+					});
+				}
+
+				// Persist any (new) refresh token so future runs can skip logging in
+				let onRefreshToken = (token) => {
+					if (typeof options.onRefreshToken === "function") {
+						options.onRefreshToken(token);
+					}
+				};
+				this.client.on("refreshToken", onRefreshToken);
 
 				// Ask the caller for a Steam Guard code if the account requires one.
 				// "domain" is null for the mobile authenticator / two-factor codes and
@@ -94,6 +109,7 @@ module.exports = class ClientShared extends Events {
 					});
 				}).finally(() => {
 					this.client.removeListener("steamGuard", onSteamGuard);
+					this.client.removeListener("refreshToken", onRefreshToken);
 					this.client.removeAllListeners("loggedOn");
 					this.client.removeAllListeners("error");
 				});
