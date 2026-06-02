@@ -59,6 +59,12 @@ Set a different port with `PORT=8080 npm run gui`.
 
 > The GUI binds to `localhost` only. Don't expose it to the internet - it can log into your Steam accounts.
 
+A few notes:
+
+- The accounts you use are remembered in `accounts.json` (git-ignored). If you tick **Remember password** the password is stored there in **plain text** - otherwise only the username is kept and you rely on the saved session or type the password each time. Use the dropdown's remove option, or delete `accounts.json`, to forget an account.
+- Like the CLI, a successful login is cached in `sessions.json` so later connects skip the password and Steam Guard prompts (and avoid Steam's login throttling).
+- The visual inventory grid needs the boosting account's inventory set to **public**. If it's private or empty, use **Add an item by ID instead** - see [Find Item ID](#find-item-id).
+
 ## CLI walkthrough
 
 When you run `node index.js` it walks you through each step:
