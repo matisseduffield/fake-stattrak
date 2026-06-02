@@ -32,10 +32,11 @@ These StatTrak increments basically just tell Valve to update the item and chang
 ```sh
 git clone https://github.com/matisseduffield/fake-stattrak.git
 cd fake-stattrak
-npm install          # install dependencies
-# Exit / log out of Steam first - see "Valve Anti-Cheat" below
-npm start            # or: node index.js
+npm install
+npm start
 ```
+
+`npm start` is the same as `node index.js`. **Log out of / exit Steam before running** - see [Valve Anti-Cheat](#valve-anti-cheat).
 
 That's it - the interactive setup asks you everything. Run `node index.js --help` for the available options.
 
