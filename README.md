@@ -30,7 +30,7 @@ These StatTrak increments basically just tell Valve to update the item and chang
 ## Quick start
 
 ```sh
-git clone https://github.com/BeepIsla/fake-stattrak.git
+git clone https://github.com/matisseduffield/fake-stattrak.git
 cd fake-stattrak
 npm install          # install dependencies
 # Exit / log out of Steam first - see "Valve Anti-Cheat" below
@@ -99,7 +99,7 @@ Used by `node index.js --config`. The interactive mode can create this file for 
 - `appID`: Number - ID of the game your item is from - *Currently only Counter-Strike 2 (`730`) and TF2 (`440`) are supported*
 - `eventType`: Number - The event type which defines what stat on an item gets changed - [More Info](#event-type)
 - `incrementValue`: Number - How much you want to add to the current item
-  - **Note:** Many changes have been made behind the scenes, this might not properly work! If you have problems please open a new [Issue on Github](https://github.com/BeepIsla/fake-stattrak/issues)
+  - **Note:** Many changes have been made behind the scenes, this might not properly work! If you have problems please open a new [Issue on Github](https://github.com/matisseduffield/fake-stattrak/issues)
 
 ## Troubleshooting
 
@@ -110,7 +110,7 @@ Used by `node index.js --config`. The interactive mode can create this file for 
 - **No items in the picker** - your inventory is probably private. Set it to public ([privacy settings](https://steamcommunity.com/my/edit/settings)) or enter the item ID manually.
 - **The new count doesn't show up** - it can take a few minutes for Valve to process, and your inventory may be briefly inaccessible. Double-check you used the correct item ID if it never appears.
 
-If you hit something not covered here, open an [Issue on GitHub](https://github.com/BeepIsla/fake-stattrak/issues).
+If you hit something not covered here, open an [Issue on GitHub](https://github.com/matisseduffield/fake-stattrak/issues).
 
 ## Valve Anti-Cheat
 
