@@ -24,6 +24,7 @@ const HELP_TEXT = `Fake StatTrak - apply fake kills to StatTrak / Strange weapon
 Usage:
   node index.js            Interactive setup (recommended) - asks you everything
   node index.js --config   Run non-interactively using config.json
+  node index.js --force     Skip the post-throttle cooldown and try logging in now
   node index.js --help      Show this help
 
 Interactive mode walks you through the game, accounts (including Steam Guard
@@ -77,6 +78,14 @@ const onCancel = () => {
 // Turn the raw errors thrown by steam-user / the network into something readable
 function handleFatalError(err) {
 	process.exitCode = 1;
+
+	// Errors we raised on purpose (e.g. the throttle cooldown) already carry a
+	// user-friendly message, so just print it and stop.
+	if (err && err.handled) {
+		console.error("\n" + err.message);
+		setTimeout(() => process.exit(1), 250);
+		return;
+	}
 
 	let eresultName = err && typeof err.eresult === "number" ? SteamUser.EResult[err.eresult] : null;
 	console.error("\nSomething went wrong: " + (err && err.message ? err.message : err));
@@ -257,6 +266,21 @@ async function resolveItemID(steamID64, appID) {
 // Validation
 // ---------------------------------------------------------------------------
 
+// Human-friendly duration like "12 minutes" / "1 minute 30 seconds"
+function formatDuration(ms) {
+	let totalSeconds = Math.ceil(ms / 1000);
+	let minutes = Math.floor(totalSeconds / 60);
+	let seconds = totalSeconds % 60;
+	let parts = [];
+	if (minutes > 0) {
+		parts.push(`${minutes} minute${minutes === 1 ? "" : "s"}`);
+	}
+	if (seconds > 0 && minutes < 5) {
+		parts.push(`${seconds} second${seconds === 1 ? "" : "s"}`);
+	}
+	return parts.join(" ") || "a moment";
+}
+
 // Parse a user-entered amount, allowing thousands separators ("1,000,000").
 // Returns a positive safe integer, or null if it isn't a valid amount.
 function parseAmount(value) {
@@ -384,27 +408,51 @@ async function steamGuardPrompt(domain, lastCodeWrong, username) {
 // to re-enter the password / Steam Guard code (and don't trip Steam's throttling)
 // on every run. Falls back to a normal credential login if there's no usable token.
 async function loginWithSession(client, account) {
+	// If Steam recently throttled this account, don't immediately try again -
+	// re-attempting too soon can extend the throttle. (Override with --force.)
+	let remaining = Sessions.throttleRemainingMs(account.username);
+	if (remaining > 0 && !process.argv.includes("--force")) {
+		let err = new Error(
+			`${account.username} was throttled by Steam recently. Waiting protects you from a longer block.\n` +
+			`Try again in about ${formatDuration(remaining)} (or pass --force to attempt anyway).`
+		);
+		err.handled = true;
+		throw err;
+	}
+
 	let options = {
 		onSteamGuard: steamGuardPrompt,
-		onRefreshToken: (token) => Sessions.set(account.username, token)
+		onRefreshToken: (token) => Sessions.setToken(account.username, token)
 	};
 
-	let saved = Sessions.get(account.username);
+	let attempt = async (extra) => {
+		try {
+			await client.login(account.username, account.password, { ...options, ...extra });
+			Sessions.clearThrottle(account.username); // success - clear any throttle marker
+		} catch (err) {
+			if (NO_RETRY_ERESULTS.has(err && err.eresult)) {
+				Sessions.markThrottled(account.username); // back off on the next run
+			}
+			throw err;
+		}
+	};
+
+	let saved = Sessions.getToken(account.username);
 	if (saved) {
 		try {
 			console.log(`Using saved session for ${account.username} (no password/Steam Guard needed)...`);
-			await client.login(account.username, account.password, { ...options, refreshToken: saved });
+			await attempt({ refreshToken: saved });
 			return;
 		} catch (err) {
 			if (NO_RETRY_ERESULTS.has(err && err.eresult)) {
 				throw err; // Throttled/rate-limited - keep the token, retrying won't help right now
 			}
-			Sessions.remove(account.username);
+			Sessions.removeToken(account.username);
 			console.log(`Saved session for ${account.username} no longer works - logging in with the password instead.`);
 		}
 	}
 
-	await client.login(account.username, account.password, options);
+	await attempt({});
 }
 
 // ---------------------------------------------------------------------------
