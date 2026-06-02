@@ -1,4 +1,3 @@
-const path = require("path");
 const Events = require("events");
 const SteamUser = require("steam-user");
 const SteamID = require("steamid");
@@ -6,17 +5,8 @@ const StdLib = require("@doctormckay/stdlib");
 const Protobufs = require("../helpers/Protobufs.js");
 const Coordinator = require("../helpers/Coordinator.js");
 const Helper = require("../helpers/Helper.js");
+const ProtobufFiles = require("../helpers/ProtobufFiles.js");
 const validAppIDs = [440, 730];
-const appIdProtobufs = {
-	"440": {
-		name: "tf2",
-		protos: path.join(__dirname, "..", "protobufs", "tf2")
-	},
-	"730": {
-		name: "csgo",
-		protos: path.join(__dirname, "..", "protobufs", "csgo")
-	}
-};
 const versionNiceAppIdParser = {
 	"440": function (version) {
 		return version;
@@ -55,6 +45,9 @@ const EServerFlags = {
 	Private: 32
 };
 
+// Default progress reporter used by incrementKillCountAttribute when the caller
+// doesn't supply one. The interactive CLI passes its own to render a progress bar.
+const defaultProgress = (sent, total) => console.log(`Progress: ${sent} / ${total}`);
 
 module.exports = class ServerShared extends Events {
 	constructor(appID, map = "itemtest", serverName = "Development Test Server") {
@@ -70,9 +63,9 @@ module.exports = class ServerShared extends Events {
 		this.protobufs = new Protobufs([
 			{
 				name: "steam",
-				protos: path.join(__dirname, "..", "protobufs", "steam")
+				protos: ProtobufFiles.steam
 			},
-			appIdProtobufs[this.appID]
+			ProtobufFiles.app[this.appID]
 		]);
 
 		this.client = new SteamUser();
@@ -520,3 +513,6 @@ module.exports = class ServerShared extends Events {
 		});
 	}
 }
+
+// Exposed so the CS2/TF2 server subclasses can use it as their default progress reporter
+module.exports.defaultProgress = defaultProgress;

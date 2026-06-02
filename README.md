@@ -1,8 +1,10 @@
 # Fake Stattrak
 
-Apply fake kills to your stattrak and strange weapons in CSGO and TF2.
+Apply fake kills to your stattrak and strange weapons in Counter-Strike 2 and TF2.
 
-*I will be using "StatTrak", "CSGO" and "Kill" throughout this README but it also applies to TF2 and any Strange filter*
+*I will be using "StatTrak", "CS2" and "Kill" throughout this README but it also applies to TF2 and any Strange filter*
+
+*Counter-Strike 2 replaced CS:GO and uses the same App ID (`730`), so the same `appID` value continues to work.*
 
 **While Valve has not banned anyone for modifying their items like this they can ban you if they want to. Use at your own risk. I am not responsible for any damages.**
 
@@ -12,6 +14,8 @@ Apply fake kills to your stattrak and strange weapons in CSGO and TF2.
 
 StatTrak kills count on community servers too, so there logically are only two ways Valve would possibly know that you killed someone: Either the client sends something to let the game know you got a kill or the server does it. So I researched and turns out the server sends something telling the game you got a kill.
 
+CS2 still uses the same `CMsgIncrementKillCountAttribute` Game Coordinator message as CS:GO did, which is why this approach continues to work.
+
 This script creates a fake server and fake joins it with a bot account and the account you want to boost a StatTrak weapon on. Valve will think its a real match going on and will allow our fake server to send StatTrak increments.
 
 These StatTrak increments basically just tell Valve to update the item and change the kill-count on it.
@@ -19,20 +23,40 @@ These StatTrak increments basically just tell Valve to update the item and chang
 ## Requirements
 
 - [NodeJS](https://nodejs.org/en/) - `v18.10.0` or later
-- [A bit of JSON knowledge](https://www.json.org/)
 - A bot account
 
 ## Usage
 
 1. Download this repository
-2. Rename `config.json.example` to `config.json`
-3. Adjust your config - [More Info](#config)
-4. Open a command prompt inside the folder
-5. Run `npm install` to install all dependencies
-6. Exit out of Steam - [Read Why](#valve-anti-cheat)
-7. Run `node index.js`
+2. Open a command prompt inside the folder
+3. Run `npm install` to install all dependencies
+4. Exit out of Steam - [Read Why](#valve-anti-cheat)
+5. Run `node index.js` and follow the prompts
+
+The interactive setup walks you through everything - picking the game, logging
+in (including Steam Guard codes), choosing the item and the stat to change, and
+how much to add. No need to edit any files by hand.
+
+### Quality of life features
+
+- **Interactive prompts** - pick the game, stat and amount from menus instead of editing JSON.
+- **Inventory item picker** - if your inventory is public it lists your StatTrak/Strange items so you can pick one instead of looking up the item ID.
+- **Steam Guard / 2FA support** - you'll be asked for your mobile or email code at login when needed.
+- **Live progress bar** - see exactly how far along the increments are.
+- **Fast startup** - only the required protobufs are loaded, so connecting takes a moment instead of a minute.
+- **Saved config** - optionally save your answers to `config.json` and re-run non-interactively with `node index.js --config`.
+
+### Running non-interactively
+
+If you prefer the old behaviour, create a `config.json` (see `config.json.example`) and run:
+
+```
+node index.js --config
+```
 
 ## Config
+
+Used by `node index.js --config`. The interactive mode can create this file for you.
 
 - `boostingAccount`: Object - Account details of the account with the item you want to boost
   - `username`: String - Login username
@@ -41,7 +65,7 @@ These StatTrak increments basically just tell Valve to update the item and chang
   - `username`: String - Login username
   - `password`: String - Login password
 - `itemID`: String - Item ID of the item you want to boost - [How to find the item ID](#find-item-id)
-- `appID`: Number - ID of the game your item is from - *Currently only CSGO (`730`) and TF2 (`440`) are supported*
+- `appID`: Number - ID of the game your item is from - *Currently only Counter-Strike 2 (`730`) and TF2 (`440`) are supported*
 - `eventType`: Number - The event type which defines what stat on an item gets changed - [More Info](#event-type)
 - `incrementValue`: Number - How much you want to add to the current item
   - **Note:** Many changes have been made behind the scenes, this might not properly work! If you have problems please open a new [Issue on Github](https://github.com/BeepIsla/fake-stattrak/issues)
@@ -61,7 +85,7 @@ An event type tells Steam what statistic on a weapon you want to modify, this is
 **Note:** Some my not work due to them being only counted on official servers, one example is the MVP counter on music kits. I have attempted to automate everything, including splitting StatTrak increases, and detecting "Official Server Only" event types. This is not perfect so some may not work.
 
 <details>
-<summary>Counter-Strike: Global Offensive</summary>
+<summary>Counter-Strike 2 (formerly Counter-Strike: Global Offensive)</summary>
 
 | Type ID | Name                                | Internal Name |
 |---------|-------------------------------------|---------------|

@@ -1,21 +1,11 @@
-const path = require("path");
 const Events = require("events");
 const SteamUser = require("steam-user");
 const StdLib = require("@doctormckay/stdlib");
 const Protobufs = require("../helpers/Protobufs.js");
 const Coordinator = require("../helpers/Coordinator.js");
 const Helper = require("../helpers/Helper.js");
+const ProtobufFiles = require("../helpers/ProtobufFiles.js");
 const validAppIDs = [440, 730];
-const appIdProtobufs = {
-	"440": {
-		name: "tf2",
-		protos: path.join(__dirname, "..", "protobufs", "tf2")
-	},
-	"730": {
-		name: "csgo",
-		protos: path.join(__dirname, "..", "protobufs", "csgo")
-	}
-};
 const versionNiceAppIdParser = {
 	"440": function (version) {
 		return version;
@@ -37,9 +27,9 @@ module.exports = class ClientShared extends Events {
 		this.protobufs = new Protobufs([
 			{
 				name: "steam",
-				protos: path.join(__dirname, "..", "protobufs", "steam")
+				protos: ProtobufFiles.steam
 			},
-			appIdProtobufs[this.appID]
+			ProtobufFiles.app[this.appID]
 		]);
 
 		this.client = new SteamUser();
@@ -59,7 +49,7 @@ module.exports = class ClientShared extends Events {
 		return this.client.steamID;
 	}
 
-	login(username, password) {
+	login(username, password, options = {}) {
 		return new Promise(async (resolve, reject) => {
 			try {
 				let version = await Helper.GetSteamAPI("ISteamApps", "UpToDateCheck", "v1", {
@@ -80,6 +70,21 @@ module.exports = class ClientShared extends Events {
 					password: password
 				});
 
+				// Ask the caller for a Steam Guard code if the account requires one.
+				// "domain" is null for the mobile authenticator / two-factor codes and
+				// an email domain when the code was sent via email.
+				let onSteamGuard = (domain, callback, lastCodeWrong) => {
+					if (typeof options.onSteamGuard !== "function") {
+						callback(""); // No handler available - let Steam reject with an InvalidLoginAuthCode error
+						return;
+					}
+
+					Promise.resolve(options.onSteamGuard(domain, lastCodeWrong, username))
+						.then((code) => callback(typeof code === "string" ? code.trim() : ""))
+						.catch((err) => reject(err));
+				};
+				this.client.on("steamGuard", onSteamGuard);
+
 				await new Promise((res, rej) => {
 					this.client.on("loggedOn", (details) => {
 						res();
@@ -88,6 +93,7 @@ module.exports = class ClientShared extends Events {
 						rej(err);
 					});
 				}).finally(() => {
+					this.client.removeListener("steamGuard", onSteamGuard);
 					this.client.removeAllListeners("loggedOn");
 					this.client.removeAllListeners("error");
 				});

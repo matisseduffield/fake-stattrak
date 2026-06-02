@@ -45,6 +45,34 @@ module.exports = class Protobufs {
 	}
 
 	/**
+	 * Resolve a protobuf message type by name.
+	 *
+	 * Namespaces are searched in reverse insertion order so the game-specific
+	 * protobufs (always added last, e.g. "csgo"/"tf2") take priority over the
+	 * shared "steam" protobufs. This matters because some message names collide
+	 * across namespaces - for example "CMsgClientHello" exists both in Steam
+	 * (only "protocol_version") and in the game's GC SDK (the "version" field we
+	 * actually need for CS2). Searching steam-first silently dropped the version
+	 * and the Game Coordinator never sent back a welcome.
+	 * @param {String} protobufName Name of the protobuf message type
+	 * @returns {Object|undefined}
+	 */
+	_resolveProto(protobufName) {
+		if (this.data[protobufName]) {
+			return this.data[protobufName];
+		}
+
+		let keys = Object.keys(this.data).reverse();
+		for (let key of keys) {
+			if (this.data[key][protobufName]) {
+				return this.data[key][protobufName];
+			}
+		}
+
+		return undefined;
+	}
+
+	/**
 	 * Decode a protobuf
 	 * @param {String|Object} protobuf Protobuf to decode buffer
 	 * @param {Buffer|ByteBuffer} buffer Buffer to decode
@@ -52,17 +80,7 @@ module.exports = class Protobufs {
 	 */
 	decodeProto(protobuf, buffer) {
 		if (typeof protobuf === "string") {
-			let protobufName = protobuf;
-			protobuf = this.data[protobufName];
-
-			if (!protobuf) {
-				for (let key in this.data) {
-					protobuf = this.data[key][protobufName];
-					if (protobuf) {
-						break;
-					}
-				}
-			}
+			protobuf = this._resolveProto(protobuf);
 
 			if (!protobuf) {
 				return undefined;
@@ -85,17 +103,7 @@ module.exports = class Protobufs {
 	 */
 	encodeProto(protobuf, data) {
 		if (typeof protobuf === "string") {
-			let protobufName = protobuf;
-			protobuf = this.data[protobufName];
-
-			if (!protobuf) {
-				for (let key in this.data) {
-					protobuf = this.data[key][protobufName];
-					if (protobuf) {
-						break;
-					}
-				}
-			}
+			protobuf = this._resolveProto(protobuf);
 
 			if (!protobuf) {
 				return undefined;
