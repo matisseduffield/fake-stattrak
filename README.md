@@ -61,7 +61,7 @@ Sending [##############################] 100.0%  1,337 / 1,337
 
 A few notes:
 
-- The **login username is your Steam account name** - the one you type into the Steam client - **not your email address**. Using the email will fail every time and can get your IP temporarily throttled.
+- The **login username is the name you sign into Steam with** - usually your Steam account name rather than your email. If a login fails, double-check this.
 - You'll only be asked for a **Steam Guard code** if the account has 2FA enabled (mobile or email). The prompt tells you where to get the code.
 - The **item picker** only appears if your inventory is set to **public**. If it's private or empty you'll be asked to type the item ID instead - see [Find Item ID](#find-item-id).
 - Stats that only count on official Valve servers (such as Competitive MVPs) are hidden, because they can't be boosted this way.
@@ -108,8 +108,7 @@ Used by `node index.js --config`. The interactive mode can create this file for 
 
 - **`Failed to connect to Steam`** - the Game Coordinator didn't answer. Make sure you're fully logged out of the Steam client, wait a moment and try again; Steam occasionally needs a couple of attempts.
 - **`InvalidPassword`** - the username or password was wrong. Some accounts can no longer log in with a password alone - make sure the account has a normal password set.
-- **`RateLimitExceeded` / `AccountLoginDeniedThrottle`** - too many login attempts from your IP. **Stop retrying** - each attempt can reset the timer (often 30+ minutes, sometimes hours). A common cause is entering your **email instead of your Steam account name**, which fails every time and feeds the throttle. Once you've logged in successfully once, the saved session in `sessions.json` lets later runs skip logging in. Logging in from a different network (e.g. a phone hotspot) also avoids the block.
-- **`InvalidPassword`** when you're sure the password is right - double-check you're using your Steam **account name**, not your email address.
+- **`RateLimitExceeded` / `AccountLoginDeniedThrottle`** - too many login attempts from your IP. **Stop retrying** - each attempt can reset the timer (often 30+ minutes, sometimes hours). Once you've logged in successfully once, the saved session in `sessions.json` lets later runs skip logging in. Logging in from a different network (e.g. a phone hotspot) also avoids the block. If your logins keep failing, make sure the username is the name you sign into Steam with (usually the account name, not the email).
 - **Wrong Steam Guard code** - check that your phone's clock is accurate, then re-run and enter a fresh code.
 - **No items in the picker** - your inventory is probably private. Set it to public ([privacy settings](https://steamcommunity.com/my/edit/settings)) or enter the item ID manually.
 - **The new count doesn't show up** - it can take a few minutes for Valve to process, and your inventory may be briefly inaccessible. Double-check you used the correct item ID if it never appears.
