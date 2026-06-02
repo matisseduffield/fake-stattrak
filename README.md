@@ -23,19 +23,47 @@ These StatTrak increments basically just tell Valve to update the item and chang
 ## Requirements
 
 - [NodeJS](https://nodejs.org/en/) - `v18.10.0` or later
-- A bot account
+- **Two Steam accounts:**
+  - The **boosting account** - the one that owns the StatTrak / Strange item you want to boost.
+  - A **bot account** - any other account, used to fill the fake server so Valve sees a "real" match. It does not need to own the game; a free secondary account works.
 
-## Usage
+## Quick start
 
-1. Download this repository
-2. Open a command prompt inside the folder
-3. Run `npm install` to install all dependencies
-4. Exit out of Steam - [Read Why](#valve-anti-cheat)
-5. Run `node index.js` and follow the prompts
+```sh
+git clone https://github.com/BeepIsla/fake-stattrak.git
+cd fake-stattrak
+npm install          # install dependencies
+# Exit / log out of Steam first - see "Valve Anti-Cheat" below
+npm start            # or: node index.js
+```
 
-The interactive setup walks you through everything - picking the game, logging
-in (including Steam Guard codes), choosing the item and the stat to change, and
-how much to add. No need to edit any files by hand.
+That's it - the interactive setup asks you everything. Run `node index.js --help` for the available options.
+
+## Walkthrough
+
+When you run `node index.js` it walks you through each step:
+
+```
+? Which game? › Counter-Strike 2
+? Login username for the account that OWNS the item (boosting account): › my_main
+? Password for my_main: › ********
+? Login username for any second account to fill the server (bot account): › my_bot
+? Password for my_bot: › ********
+? Steam Guard code for my_main (from your Steam Mobile authenticator app): › ABCDE
+Fetching your inventory...
+? Pick the item to boost (3 StatTrak/Strange items found, type to filter): › StatTrak™ AK-47 | Redline (Field-Tested)
+? Which stat do you want to change? › 0 - StatTrak™ Confirmed Kills
+? How much do you want to add to the counter? › 1337
+? Proceed? › yes
+Sending [##############################] 100.0%  1,337 / 1,337
+```
+
+A few notes:
+
+- You'll only be asked for a **Steam Guard code** if the account has 2FA enabled (mobile or email). The prompt tells you where to get the code.
+- The **item picker** only appears if your inventory is set to **public**. If it's private or empty you'll be asked to type the item ID instead - see [Find Item ID](#find-item-id).
+- Stats that only count on official Valve servers (such as Competitive MVPs) are hidden, because they can't be boosted this way.
+- At the end you can optionally **save your answers to `config.json`** so you can re-run without the questions.
 
 ### Quality of life features
 
@@ -43,16 +71,19 @@ how much to add. No need to edit any files by hand.
 - **Inventory item picker** - if your inventory is public it lists your StatTrak/Strange items so you can pick one instead of looking up the item ID.
 - **Steam Guard / 2FA support** - you'll be asked for your mobile or email code at login when needed.
 - **Live progress bar** - see exactly how far along the increments are.
-- **Fast startup** - only the required protobufs are loaded, so connecting takes a moment instead of a minute.
+- **Fast startup** - only the required protobufs are loaded, so connecting takes about a second instead of a minute.
 - **Saved config** - optionally save your answers to `config.json` and re-run non-interactively with `node index.js --config`.
 
 ### Running non-interactively
 
-If you prefer the old behaviour, create a `config.json` (see `config.json.example`) and run:
+If you prefer the old behaviour, create a `config.json` (see `config.json.example`) and run either of:
 
-```
+```sh
 node index.js --config
+npm run start:config
 ```
+
+Your config is validated before anything happens, so typos and unsupported values are reported up front.
 
 ## Config
 
@@ -69,6 +100,17 @@ Used by `node index.js --config`. The interactive mode can create this file for 
 - `eventType`: Number - The event type which defines what stat on an item gets changed - [More Info](#event-type)
 - `incrementValue`: Number - How much you want to add to the current item
   - **Note:** Many changes have been made behind the scenes, this might not properly work! If you have problems please open a new [Issue on Github](https://github.com/BeepIsla/fake-stattrak/issues)
+
+## Troubleshooting
+
+- **`Failed to connect to Steam`** - the Game Coordinator didn't answer. Make sure you're fully logged out of the Steam client, wait a moment and try again; Steam occasionally needs a couple of attempts.
+- **`InvalidPassword`** - the username or password was wrong. Some accounts can no longer log in with a password alone - make sure the account has a normal password set.
+- **`RateLimitExceeded` / login throttled** - too many login attempts from your IP. Wait a while (often 30+ minutes) before trying again.
+- **Wrong Steam Guard code** - check that your phone's clock is accurate, then re-run and enter a fresh code.
+- **No items in the picker** - your inventory is probably private. Set it to public ([privacy settings](https://steamcommunity.com/my/edit/settings)) or enter the item ID manually.
+- **The new count doesn't show up** - it can take a few minutes for Valve to process, and your inventory may be briefly inaccessible. Double-check you used the correct item ID if it never appears.
+
+If you hit something not covered here, open an [Issue on GitHub](https://github.com/BeepIsla/fake-stattrak/issues).
 
 ## Valve Anti-Cheat
 

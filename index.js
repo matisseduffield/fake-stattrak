@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const prompts = require("prompts");
+const SteamUser = require("steam-user");
 const Helper = require("./helpers/Helper.js");
 const EventTypes = require("./helpers/EventTypes.js");
 const Inventory = require("./helpers/Inventory.js");
@@ -11,6 +12,19 @@ const GAMES = {
 	440: "Team Fortress 2"
 };
 
+const HELP_TEXT = `Fake StatTrak - apply fake kills to StatTrak / Strange weapons in CS2 and TF2
+
+Usage:
+  node index.js            Interactive setup (recommended) - asks you everything
+  node index.js --config   Run non-interactively using config.json
+  node index.js --help      Show this help
+
+Interactive mode walks you through the game, accounts (including Steam Guard
+codes), the item to boost, the stat to change and the amount. See the README
+for how to find an item ID and the full list of stats (event types).
+
+Tip: exit Steam before running this to avoid VAC session errors (see README).`;
+
 // prompts() resolves to {} when the user hits Ctrl+C; this makes that exit cleanly
 const onCancel = () => {
 	console.log("\nCancelled.");
@@ -18,11 +32,16 @@ const onCancel = () => {
 };
 
 (async () => {
+	if (process.argv.includes("--help") || process.argv.includes("-h")) {
+		console.log(HELP_TEXT);
+		return;
+	}
+
 	let headless = process.argv.includes("--config") || process.argv.includes("-c");
 
 	console.log("Validating protobufs...");
 	if (!await ensureProtobufs()) {
-		console.log("Failed to find or download protobufs.");
+		console.log("Failed to find or download protobufs. Check your internet connection and try again.");
 		return;
 	}
 
@@ -46,7 +65,33 @@ const onCancel = () => {
 	}
 
 	await run(config, headless);
-})();
+})().catch(handleFatalError);
+
+// Turn the raw errors thrown by steam-user / the network into something readable
+function handleFatalError(err) {
+	process.exitCode = 1;
+
+	let eresultName = err && typeof err.eresult === "number" ? SteamUser.EResult[err.eresult] : null;
+	console.error("\nSomething went wrong: " + (err && err.message ? err.message : err));
+
+	let hint = {
+		InvalidPassword: "Steam rejected the login - double-check the username and password (and that the account isn't using a login QR/token only).",
+		RateLimitExceeded: "Steam is rate limiting logins from your IP. Wait a while (often 30+ minutes) before trying again.",
+		AccountLoginDeniedThrottle: "Too many login attempts. Wait a while before trying again.",
+		TwoFactorCodeMismatch: "The Steam Guard code didn't match. Make sure your phone's clock is correct and try again.",
+		AccountDisabled: "This Steam account is disabled and can't be used."
+	}[eresultName];
+
+	if (hint) {
+		console.error(hint);
+	} else if (eresultName) {
+		console.error("Steam returned: " + eresultName);
+	}
+
+	// Logged-in Steam clients keep the event loop alive, so force an exit once
+	// the message has been written instead of hanging on a half-open session.
+	setTimeout(() => process.exit(1), 500);
+}
 
 // ---------------------------------------------------------------------------
 // Interactive setup
