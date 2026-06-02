@@ -235,6 +235,9 @@ module.exports = class GuiSession extends EventEmitter {
 		if (!Number.isInteger(amount) || amount <= 0) {
 			throw new Error("Amount must be a whole number greater than 0.");
 		}
+		if (amount > 2147483647) {
+			throw new Error("Amount is too large (max 2,147,483,647 - a StatTrak counter is a 32-bit integer).");
+		}
 		if (!this.appID || !EventTypes[this.appID]?.[eventType]) {
 			throw new Error("Pick a valid stat.");
 		}
@@ -296,13 +299,17 @@ module.exports = class GuiSession extends EventEmitter {
 		this.pushState();
 		this.log("Starting job queue...");
 
+		// Small settle delay so the GC has finished receiving our session data
+		// before the first batch (mirrors the CLI flow).
+		await new Promise(p => setTimeout(p, 1000));
+
 		try {
 			for (let job of this.jobs) {
+				if (this.stopRequested || !this.connected) {
+					break;
+				}
 				if (job.status !== "queued") {
 					continue;
-				}
-				if (this.stopRequested) {
-					break;
 				}
 
 				job.status = "running";
@@ -310,18 +317,21 @@ module.exports = class GuiSession extends EventEmitter {
 				this.pushState();
 				this.log(`Boosting "${job.itemName}" - ${job.statName} +${job.amount.toLocaleString()}`);
 
+				// Stop if the user asked to, or if we got disconnected mid-job
+				let shouldStop = () => this.stopRequested || !this.connected;
+
 				try {
-					await this.server.incrementKillCountAttribute(
+					let stopped = await this.server.incrementKillCountAttribute(
 						this.clients[1].steamID,
 						this.clients[0].steamID,
 						job.itemID,
 						job.eventType,
 						job.amount,
 						(sent) => { job.sent = sent; this.emit("event", { type: "progress", jobId: job.id, sent, total: job.amount }); },
-						() => this.stopRequested
+						shouldStop
 					);
 
-					if (this.stopRequested) {
+					if (stopped) {
 						job.status = "stopped";
 						this.log(`Stopped "${job.itemName}" at ${job.sent.toLocaleString()} / ${job.amount.toLocaleString()}.`, "warn");
 					} else {
@@ -340,7 +350,10 @@ module.exports = class GuiSession extends EventEmitter {
 			this.running = false;
 			this.stopRequested = false;
 			this.pushState();
-			this.log("Job queue finished. Valve may take a few minutes to process the changes.", "success");
+			// Don't claim success if we bailed out because the user disconnected
+			if (this.connected) {
+				this.log("Job queue finished. Valve may take a few minutes to process the changes.", "success");
+			}
 		}
 	}
 

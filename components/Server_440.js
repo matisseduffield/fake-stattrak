@@ -93,7 +93,7 @@ module.exports = class TF2Server extends ServerShared {
 
 		for (let i = 0; i < chunksNeeded; i++) {
 			if (shouldStop()) {
-				return; // Caller asked us to stop (e.g. GUI stop button)
+				return true; // Caller asked us to stop (e.g. GUI stop button)
 			}
 			onProgress(Math.min(i * increment * maximumMultipleChildren, amount), amount);
 			await new Promise(p => setTimeout(p, 50));
@@ -123,6 +123,7 @@ module.exports = class TF2Server extends ServerShared {
 
 		// We are done! Final progress log (Its not truly calculated so if the above math is wrong this will be wrong too, lets hope I am smart)
 		onProgress(amount, amount);
+		return false; // ran to completion (not stopped)
 	}
 
 	upgradeMerasmusLevel(player, level) {

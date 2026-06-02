@@ -56,11 +56,11 @@ module.exports = class Inventory {
 				name: desc.market_hash_name || desc.market_name || desc.name || `Item ${asset.assetid}`,
 				iconUrl: this.iconUrl(desc),
 				count: this.currentCount(desc),
-				color: desc.name_color ? `#${desc.name_color}` : null
+				color: this.nameColor(desc)
 			});
 		}
 
-		// Show StatTrak/Strange items first, then alphabetical
+		// Alphabetical so the grid is easy to scan
 		items.sort((a, b) => a.name.localeCompare(b.name));
 		return items;
 	}
@@ -80,8 +80,9 @@ module.exports = class Inventory {
 
 	/**
 	 * Best-effort current counter value, parsed from the item's description text
-	 * (e.g. "StatTrak™ Kills: 1337"). Not always present in public inventory
-	 * data, in which case this returns null.
+	 * (e.g. "StatTrak™ Kills: 1337"). Only lines that actually mention StatTrak or
+	 * Strange are considered, so unrelated "Kills" flavour text isn't misread. Not
+	 * always present in public inventory data, in which case this returns null.
 	 * @param {Object} desc Steam inventory description object
 	 * @returns {Number|null}
 	 */
@@ -92,7 +93,10 @@ module.exports = class Inventory {
 
 		for (let line of lines) {
 			let text = (line && line.value) || "";
-			let match = text.match(/(?:StatTrak|Strange|Kills?)[^\d]*([\d,]+)/i);
+			if (!/StatTrak|Strange/i.test(text)) {
+				continue;
+			}
+			let match = text.match(/([\d,]+)/);
 			if (match) {
 				let n = Number(match[1].replace(/,/g, ""));
 				if (Number.isFinite(n)) {
@@ -101,6 +105,18 @@ module.exports = class Inventory {
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * The item's name colour as a CSS hex string, but only if Steam gave us a
+	 * valid 3/6-digit hex value. Validating here stops untrusted inventory data
+	 * from being injected into a CSS context in the GUI.
+	 * @param {Object} desc Steam inventory description object
+	 * @returns {String|null}
+	 */
+	static nameColor(desc) {
+		let raw = String(desc.name_color || "").trim();
+		return /^[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(raw) ? `#${raw}` : null;
 	}
 
 	/**

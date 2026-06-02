@@ -6,10 +6,12 @@ module.exports = class CSGOClient extends ClientShared {
 		super(730);
 	}
 
-	login(username, password) {
+	login(username, password, options = {}) {
 		return new Promise(async (resolve, reject) => {
 			try {
-				let data = await super.login(username, password);
+				// Forward options (saved session token, Steam Guard + refresh-token
+				// callbacks) to the shared login - without this they'd be dropped.
+				let data = await super.login(username, password, options);
 
 				// Finalizing
 				let mmWelcome = await this.coordinator.sendMessage(

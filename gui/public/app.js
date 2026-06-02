@@ -21,15 +21,21 @@ let GAMES = [];
 let state = null;
 let selectedItem = null; // for the job dialog
 
+const MAX_AMOUNT = 2147483647; // StatTrak/Strange counters are a signed 32-bit int
+
 // ---- boot ----
 (async () => {
-	let { games } = await api("GET", "/api/games");
-	GAMES = games;
-	$("#gameSelect").append(...games.map(g => el("option", { value: g.appID, textContent: g.name })));
-	$("#gameSelect").onchange = () => { if (!state || !state.connected) renderAccountFields(); };
-	renderAccountFields();
 	wireEvents();
 	connectStream();
+	$("#gameSelect").onchange = () => { if (!state || !state.connected) renderAccountFields(); };
+	renderAccountFields();
+	try {
+		let { games } = await api("GET", "/api/games");
+		GAMES = games;
+		$("#gameSelect").append(...games.map(g => el("option", { value: g.appID, textContent: g.name })));
+	} catch (err) {
+		showError(new Error("Couldn't load the game list - is the server running? " + err.message));
+	}
 })();
 
 function connectStream() {
@@ -66,6 +72,7 @@ function render() {
 
 	$("#connectBtn").disabled = state.connecting;
 	$("#connectBtn").textContent = state.connecting ? "Connecting..." : "Connect";
+	$("#gameSelect").disabled = state.connected || state.connecting;
 
 	if (state.connected) {
 		$("#connectedGame").textContent = state.game;
@@ -75,17 +82,20 @@ function render() {
 		renderQueue();
 	}
 
-	// steam guard
+	// steam guard - only grab focus when the dialog first opens, so state pushes
+	// (or an SSE reconnect) don't steal the caret while the user types the code
+	let guardDialog = $("#guardDialog");
+	let guardWasHidden = guardDialog.classList.contains("hidden");
 	if (state.pendingGuard) {
 		let g = state.pendingGuard;
 		$("#guardText").textContent =
 			(g.lastCodeWrong ? "That code was wrong. " : "") +
 			`Enter the Steam Guard code for ${g.username} ` +
 			(g.domain ? `(emailed to ${g.domain}).` : "(from your mobile authenticator).");
-		$("#guardDialog").classList.remove("hidden");
-		$("#guardCode").focus();
-	} else {
-		$("#guardDialog").classList.add("hidden");
+		guardDialog.classList.remove("hidden");
+		if (guardWasHidden) { $("#guardCode").value = ""; $("#guardCode").focus(); }
+	} else if (!guardWasHidden) {
+		guardDialog.classList.add("hidden");
 		$("#guardCode").value = "";
 	}
 
@@ -93,8 +103,9 @@ function render() {
 }
 
 function currentGame() {
-	let appID = Number($("#gameSelect").value);
-	return GAMES.find(g => g.appID === appID) || GAMES[0];
+	// Prefer the connected game; fall back to the dropdown before connecting
+	let appID = (state && state.appID) || Number($("#gameSelect").value);
+	return GAMES.find(g => g.appID === appID) || null;
 }
 
 function renderAccountFields() {
@@ -134,18 +145,21 @@ function renderBadges(container, acc) {
 }
 
 function refreshAccountBadges() {
-	// keep dropdown options in sync after connect/disconnect without nuking typed input
-	if (state && !state.connected) {
-		for (let role of ["boosting", "bot"]) {
-			let wrap = document.querySelector(`.account-fields[data-role="${role}"]`);
-			let select = wrap.querySelector(".acc-select");
-			let current = select.value;
-			let accounts = (state.accounts) || [];
-			select.innerHTML = "";
-			select.append(el("option", { value: "", textContent: "+ New account..." }));
-			for (let a of accounts) select.append(el("option", { value: a.username, textContent: a.username }));
-			select.value = current;
-		}
+	// keep the dropdown options, password placeholder and session/cooldown badges
+	// in sync on every state push, without nuking what the user is typing
+	if (!state || state.connected) return;
+	let accounts = state.accounts || [];
+	for (let role of ["boosting", "bot"]) {
+		let wrap = document.querySelector(`.account-fields[data-role="${role}"]`);
+		let select = wrap.querySelector(".acc-select");
+		let current = select.value;
+		select.innerHTML = "";
+		select.append(el("option", { value: "", textContent: "+ New account..." }));
+		for (let a of accounts) select.append(el("option", { value: a.username, textContent: a.username }));
+		select.value = current;
+		let acc = accounts.find(a => a.username === current);
+		wrap.querySelector(".acc-password").placeholder = acc && acc.hasSession ? "Saved session - leave blank" : "Password";
+		renderBadges(wrap.querySelector(".account-badges"), acc);
 	}
 }
 
@@ -187,9 +201,11 @@ function openJobDialog(item) {
 	let img = $("#jobDialogImg");
 	if (item.iconUrl) { img.src = item.iconUrl; img.classList.remove("hidden"); } else img.classList.add("hidden");
 
+	let game = currentGame();
+	if (!game) return showError(new Error("Game list not loaded yet - reload the page."));
 	let stat = $("#jobStat");
 	stat.innerHTML = "";
-	for (let s of currentGame().stats) stat.append(el("option", { value: s.eventType, textContent: s.name }));
+	for (let s of game.stats) stat.append(el("option", { value: s.eventType, textContent: s.name }));
 	$("#jobAmount").value = "1000";
 	$("#jobDialog").classList.remove("hidden");
 	$("#jobAmount").focus();
@@ -246,6 +262,7 @@ function appendLog(ev) {
 	log.append(el("div", { className: "line" },
 		el("span", { className: "time", textContent: `[${t}] ` }),
 		el("span", { className: ev.level, textContent: ev.message })));
+	while (log.childElementCount > 500) log.removeChild(log.firstChild); // cap memory on long runs
 	if (atBottom) log.scrollTop = log.scrollHeight;
 }
 
@@ -281,6 +298,7 @@ function wireEvents() {
 	$("#jobAdd").onclick = () => {
 		let amount = parseAmount($("#jobAmount").value);
 		if (!amount) return showError(new Error("Enter a whole number greater than 0."));
+		if (amount > MAX_AMOUNT) return showError(new Error(`Amount is too large (max ${fmt(MAX_AMOUNT)}).`));
 		api("POST", "/api/jobs", {
 			itemID: selectedItem.itemID,
 			itemName: selectedItem.name,
