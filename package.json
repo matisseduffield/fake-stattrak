@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "start:config": "node index.js --config",
+    "gui": "node gui.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "engines": {
@@ -24,6 +25,7 @@
   "dependencies": {
     "@doctormckay/stdlib": "^2.7.0",
     "bytebuffer": "^5.0.1",
+    "express": "^4.22.2",
     "prompts": "^2.4.2",
     "protobufjs": "^7.1.2",
     "steam-user": "^5.0.4",

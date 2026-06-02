@@ -10,7 +10,7 @@ module.exports = class Inventory {
 	 *
 	 * @param {String} steamID64 The owner's 64-bit Steam ID
 	 * @param {Number} appID 730 (CS2) or 440 (TF2)
-	 * @returns {Promise<Array<{ itemID: string, name: string }>>}
+	 * @returns {Promise<Array<{ itemID: string, name: string, iconUrl: string|null, count: number|null, color: string|null }>>}
 	 */
 	static async getBoostableItems(steamID64, appID) {
 		// Context 2 is the standard "Backpack" context for both CS2 and TF2
@@ -53,11 +53,70 @@ module.exports = class Inventory {
 
 			items.push({
 				itemID: String(asset.assetid),
-				name: desc.market_hash_name || desc.market_name || desc.name || `Item ${asset.assetid}`
+				name: desc.market_hash_name || desc.market_name || desc.name || `Item ${asset.assetid}`,
+				iconUrl: this.iconUrl(desc),
+				count: this.currentCount(desc),
+				color: this.nameColor(desc)
 			});
 		}
 
+		// Alphabetical so the grid is easy to scan
+		items.sort((a, b) => a.name.localeCompare(b.name));
 		return items;
+	}
+
+	/**
+	 * Build a usable image URL from a Steam inventory description's icon token.
+	 * @param {Object} desc Steam inventory description object
+	 * @returns {String|null}
+	 */
+	static iconUrl(desc) {
+		let token = desc.icon_url_large || desc.icon_url;
+		if (!token) {
+			return null;
+		}
+		return `https://community.fastly.steamstatic.com/economy/image/${token}/256fx256f`;
+	}
+
+	/**
+	 * Best-effort current counter value, parsed from the item's description text
+	 * (e.g. "StatTrak™ Kills: 1337"). Only lines that actually mention StatTrak or
+	 * Strange are considered, so unrelated "Kills" flavour text isn't misread. Not
+	 * always present in public inventory data, in which case this returns null.
+	 * @param {Object} desc Steam inventory description object
+	 * @returns {Number|null}
+	 */
+	static currentCount(desc) {
+		let lines = []
+			.concat(Array.isArray(desc.descriptions) ? desc.descriptions : [])
+			.concat(Array.isArray(desc.owner_descriptions) ? desc.owner_descriptions : []);
+
+		for (let line of lines) {
+			let text = (line && line.value) || "";
+			if (!/StatTrak|Strange/i.test(text)) {
+				continue;
+			}
+			let match = text.match(/([\d,]+)/);
+			if (match) {
+				let n = Number(match[1].replace(/,/g, ""));
+				if (Number.isFinite(n)) {
+					return n;
+				}
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * The item's name colour as a CSS hex string, but only if Steam gave us a
+	 * valid 3/6-digit hex value. Validating here stops untrusted inventory data
+	 * from being injected into a CSS context in the GUI.
+	 * @param {Object} desc Steam inventory description object
+	 * @returns {String|null}
+	 */
+	static nameColor(desc) {
+		let raw = String(desc.name_color || "").trim();
+		return /^[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(raw) ? `#${raw}` : null;
 	}
 
 	/**
